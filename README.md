@@ -12,6 +12,28 @@ A Microsoft Exchange 2019 Transport Agent that provides advanced sender-based ro
 - **GUI Configuration**: Windows Forms GUI for easy rule management
 - **Console Configuration**: Full-featured text-based configurator for Windows Server Core
 
+## Screenshots
+
+### Routing Rules
+Create and manage routing rules with sender/recipient conditions and wildcards.
+
+![Routing Rules](screenshots/routing_rules.png)
+
+### Test Rules
+Test your rules before deployment to verify they match correctly.
+
+![Test Rules](screenshots/test_rules.png)
+
+### Settings
+Configure agent behavior and validation options.
+
+![Settings](screenshots/settings.png)
+
+### Local Domains
+Manage local domains that bypass routing rules.
+
+![Local Domains](screenshots/local_domains.png)
+
 ## Requirements
 
 - Microsoft Exchange Server 2019 (also works with 2016)

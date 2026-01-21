@@ -1,0 +1,294 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Advanced Sender Based Routing Agent - Sample Configuration
+  ==========================================================
+
+  This file demonstrates all types of routing rules.
+  Copy to routing-config.xml and modify for your environment.
+
+  Rule evaluation: Top-to-bottom, first match wins.
+  Put specific rules BEFORE general rules.
+-->
+<configuration>
+
+  <settings>
+    <!-- Enable alias rewriting (From header + Return-Path) -->
+    <enableSendAsAlias>true</enableSendAsAlias>
+
+    <!-- Enable sender/recipient based routing -->
+    <enableSenderBasedRouting>true</enableSenderBasedRouting>
+
+    <!-- Skip routing for internal/local recipients -->
+    <bypassLocalRecipients>true</bypassLocalRecipients>
+
+    <!-- Match rules against From header (P2) instead of envelope sender (P1) -->
+    <routeByHeaderFrom>true</routeByHeaderFrom>
+
+    <!-- Validate sender has alias in proxy addresses before applying -->
+    <validateProxyAddresses>true</validateProxyAddresses>
+
+    <!-- Block alias/routing if sender doesn't have proxy address -->
+    <blockIfNoAlias>false</blockIfNoAlias>
+  </settings>
+
+  <!--
+    Local domains - recipients here bypass routing rules
+    (when bypassLocalRecipients=true)
+  -->
+  <localDomains>
+    <domain>contoso.com</domain>
+    <domain>contoso.local</domain>
+    <domain>example.com</domain>
+    <domain>corp.example.com</domain>
+  </localDomains>
+
+  <routingRules>
+
+    <!-- ============================================================
+         SECTION 1: SPECIFIC USER RULES (highest priority)
+         Put these first - they override all other rules
+         ============================================================ -->
+
+    <!-- CEO emails to VIP client go through secure relay -->
+    <rule name="CEO-to-VIP-Client"
+          senderAddress="ceo@contoso.com"
+          recipientAddress="ceo@bigclient.com"
+          addressSpace="route-secure-relay.local"
+          sendAsAlias="@executive.contoso.com" />
+
+    <!-- CFO emails to auditors use compliance relay -->
+    <rule name="CFO-to-Auditors"
+          senderAddress="cfo@contoso.com"
+          recipientDomain="@auditors-inc.com"
+          addressSpace="route-compliance.local" />
+
+    <!-- Specific user with dedicated outbound IP -->
+    <rule name="JohnSmith-Dedicated"
+          senderAddress="john.smith@example.com"
+          addressSpace="route-10-20-30-40.local"
+          sendAsAlias="@marketing.example.com" />
+
+
+    <!-- ============================================================
+         SECTION 2: DEPARTMENT TO PARTNER RULES
+         Specific sender+recipient combinations
+         ============================================================ -->
+
+    <!-- Sales to partners - use partner relay and sales alias -->
+    <rule name="Sales-to-Partners"
+          senderDomain="@sales.contoso.com"
+          recipientDomain="@partner-corp.com"
+          addressSpace="route-partner-vpn.local"
+          sendAsAlias="@sales.contoso.com" />
+
+    <!-- Sales to any distributor domain -->
+    <rule name="Sales-to-Distributors"
+          senderDomain="@sales.contoso.com"
+          recipientDomain="*.distributor.net"
+          addressSpace="route-distributor.local"
+          sendAsAlias="@wholesale.contoso.com" />
+
+    <!-- Support team to specific client -->
+    <rule name="Support-to-AcmeCorp"
+          senderDomain="@support.example.com"
+          recipientDomain="@acme-corp.com"
+          addressSpace="route-acme-dedicated.local"
+          sendAsAlias="support@acme-support.example.com" />
+
+    <!-- HR to recruiting platforms -->
+    <rule name="HR-to-Recruiting"
+          senderDomain="@hr.contoso.com"
+          recipientDomain="@linkedin.com"
+          addressSpace="route-social.local"
+          sendAsAlias="recruiting@contoso.com" />
+
+    <rule name="HR-to-Indeed"
+          senderDomain="@hr.contoso.com"
+          recipientDomain="@indeed.com"
+          addressSpace="route-social.local"
+          sendAsAlias="careers@contoso.com" />
+
+
+    <!-- ============================================================
+         SECTION 3: WILDCARD RECIPIENT RULES
+         Route based on recipient patterns
+         ============================================================ -->
+
+    <!-- All emails to any Gmail address -->
+    <rule name="AnyTo-Gmail"
+          senderDomain="@contoso.com"
+          recipientAddress="*@gmail.com"
+          addressSpace="route-consumer-mail.local" />
+
+    <!-- All emails to Yahoo/AOL/Hotmail -->
+    <rule name="AnyTo-Yahoo"
+          senderDomain="@contoso.com"
+          recipientAddress="*@yahoo.com"
+          addressSpace="route-consumer-mail.local" />
+
+    <rule name="AnyTo-Hotmail"
+          senderDomain="@contoso.com"
+          recipientAddress="*@hotmail.com"
+          addressSpace="route-consumer-mail.local" />
+
+    <!-- Emails to any .gov domain - compliance relay -->
+    <rule name="AnyTo-Government"
+          senderDomain="@contoso.com"
+          recipientDomain="*.gov"
+          addressSpace="route-gov-compliance.local" />
+
+    <!-- Emails to any .edu domain -->
+    <rule name="AnyTo-Education"
+          senderDomain="@contoso.com"
+          recipientDomain="*.edu"
+          addressSpace="route-academic.local" />
+
+
+    <!-- ============================================================
+         SECTION 4: WILDCARD SENDER RULES
+         Match sender patterns
+         ============================================================ -->
+
+    <!-- Any admin user from any subdomain -->
+    <rule name="AllAdmins"
+          senderAddress="admin*@*.contoso.com"
+          addressSpace="route-admin-relay.local"
+          sendAsAlias="@it.contoso.com" />
+
+    <!-- Any noreply address -->
+    <rule name="AllNoreply"
+          senderAddress="noreply*@contoso.com"
+          addressSpace="route-bulk.local" />
+
+    <!-- All automated/system accounts -->
+    <rule name="SystemAccounts"
+          senderAddress="system*@example.com"
+          addressSpace="route-automated.local"
+          sendAsAlias="notifications@example.com" />
+
+    <!-- Marketing team pattern (marketing1, marketing2, etc.) -->
+    <rule name="MarketingTeam"
+          senderAddress="marketing?@contoso.com"
+          addressSpace="route-marketing.local"
+          sendAsAlias="@campaigns.contoso.com" />
+
+
+    <!-- ============================================================
+         SECTION 5: SUBDOMAIN RULES
+         Route entire subdomains
+         ============================================================ -->
+
+    <!-- All subdomains of contoso.com -->
+    <rule name="AllContosoSubdomains"
+          senderDomain="*.contoso.com"
+          addressSpace="route-corp-relay.local" />
+
+    <!-- Development/test subdomain - separate relay -->
+    <rule name="DevEnvironment"
+          senderDomain="@dev.example.com"
+          addressSpace="route-dev-sandbox.local"
+          sendAsAlias="@test.example.com" />
+
+    <!-- Staging environment -->
+    <rule name="StagingEnvironment"
+          senderDomain="@staging.example.com"
+          addressSpace="route-staging.local"
+          sendAsAlias="@preview.example.com" />
+
+
+    <!-- ============================================================
+         SECTION 6: ALIAS-ONLY RULES (no routing change)
+         Just change From header, use default routing
+         ============================================================ -->
+
+    <!-- Internal domain shows external brand -->
+    <rule name="InternalToExternal-Alias"
+          senderDomain="@internal.contoso.com"
+          sendAsAlias="@contoso.com" />
+
+    <!-- Legacy domain migration -->
+    <rule name="LegacyDomain-Alias"
+          senderDomain="@old-company.com"
+          sendAsAlias="@contoso.com" />
+
+    <!-- Regional alias -->
+    <rule name="EU-Regional-Alias"
+          senderDomain="@eu.example.com"
+          sendAsAlias="@example.eu" />
+
+    <rule name="APAC-Regional-Alias"
+          senderDomain="@apac.example.com"
+          sendAsAlias="@example.asia" />
+
+
+    <!-- ============================================================
+         SECTION 7: ROUTING-ONLY RULES (no alias change)
+         Just change routing, keep original From
+         ============================================================ -->
+
+    <!-- High-volume sender through bulk relay -->
+    <rule name="Newsletter-Routing"
+          senderAddress="newsletter@contoso.com"
+          addressSpace="route-bulk-mail.local" />
+
+    <!-- Transactional emails through dedicated IP -->
+    <rule name="Transactional-Routing"
+          senderAddress="orders@example.com"
+          addressSpace="route-transactional.local" />
+
+    <rule name="Receipts-Routing"
+          senderAddress="receipts@example.com"
+          addressSpace="route-transactional.local" />
+
+
+    <!-- ============================================================
+         SECTION 8: DISABLED RULES (for reference/testing)
+         Set enabled="false" to skip without deleting
+         ============================================================ -->
+
+    <!-- Temporarily disabled for maintenance -->
+    <rule name="Maintenance-Disabled"
+          enabled="false"
+          senderDomain="@maintenance.contoso.com"
+          addressSpace="route-maintenance.local" />
+
+    <!-- Test rule - disabled in production -->
+    <rule name="Test-Rule-Disabled"
+          enabled="false"
+          senderAddress="test@contoso.com"
+          recipientAddress="test@external.com"
+          addressSpace="route-test.local"
+          sendAsAlias="@test.contoso.com" />
+
+    <!-- Future feature - not yet configured -->
+    <rule name="Future-Feature"
+          enabled="false"
+          senderDomain="@beta.example.com"
+          addressSpace="route-beta.local" />
+
+
+    <!-- ============================================================
+         SECTION 9: CATCH-ALL / DEFAULT RULES (lowest priority)
+         Put these LAST - they match everything not caught above
+         ============================================================ -->
+
+    <!-- Default for all contoso.com - lowest priority -->
+    <rule name="Contoso-Default"
+          senderDomain="@contoso.com"
+          addressSpace="route-default-contoso.local" />
+
+    <!-- Default for all example.com -->
+    <rule name="Example-Default"
+          senderDomain="@example.com"
+          addressSpace="route-default-example.local" />
+
+    <!--
+    Uncomment for ultimate catch-all (matches ANY sender):
+    <rule name="CatchAll"
+          senderDomain="*"
+          addressSpace="route-catchall.local" />
+    -->
+
+  </routingRules>
+
+</configuration>
