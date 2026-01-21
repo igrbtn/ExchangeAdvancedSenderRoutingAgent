@@ -148,6 +148,48 @@ Route emails from a specific user to a specific recipient:
 </settings>
 ```
 
+### Logging Configuration
+
+Enable file logging for troubleshooting and monitoring:
+
+```xml
+<logging>
+  <!-- Enable/disable file logging -->
+  <enableFileLogging>true</enableFileLogging>
+
+  <!-- Log level: None, Error, Warning, Info, Debug, Verbose -->
+  <logLevel>Info</logLevel>
+
+  <!-- Custom log path (leave empty for default Exchange logs folder) -->
+  <logPath></logPath>
+
+  <!-- Maximum log file size in MB before rotation -->
+  <maxLogFileSizeMB>10</maxLogFileSizeMB>
+
+  <!-- Number of rotated log files to keep -->
+  <maxLogFiles>5</maxLogFiles>
+</logging>
+```
+
+**Log Levels:**
+- `None` - No logging
+- `Error` - Only errors
+- `Warning` - Errors and warnings
+- `Info` - Normal operation messages (recommended for production)
+- `Debug` - Detailed debugging information
+- `Verbose` - All messages including detailed tracing
+
+**Default Log Location:**
+```
+C:\Program Files\Microsoft\Exchange Server\V15\TransportRoles\Logs\AdvancedSenderRouting\
+```
+
+**Log Format:**
+```
+2024-01-15 10:30:45.123 [INFO] Processing message from user@company.com
+2024-01-15 10:30:45.125 [INFO] Rule 'Sales-Route' matched sender domain @sales.company.com
+```
+
 ## Rule Evaluation
 
 - Rules are evaluated **top-to-bottom** (first rule = highest priority)
@@ -228,6 +270,20 @@ Get-TransportAgent "Advanced Sender Based Routing Agent"
 ```
 
 ### View Logs
+
+**File Logs (recommended):**
+
+Enable file logging in configuration for detailed troubleshooting:
+```powershell
+# View latest log entries
+Get-Content "C:\Program Files\Microsoft\Exchange Server\V15\TransportRoles\Logs\AdvancedSenderRouting\AdvancedSenderRouting.log" -Tail 100
+
+# Or use the configurator
+.\configure.ps1       # Option 5 > View Log
+.\configure-gui.ps1   # Logging tab > View Log
+```
+
+**Event Log:**
 ```powershell
 # Application log
 Get-EventLog -LogName Application -Source MSExchangeTransport -Newest 50 |
@@ -245,19 +301,26 @@ Restart-Service MSExchangeTransport
 ### Common Issues
 
 **From header not changing:**
+- Enable file logging with `Debug` level to see detailed processing
 - Check `sendAsAlias` format: use `@domain.com` or `user@domain.com`
 - Verify `validateProxyAddresses` setting
-- Check Event Viewer for "Send-As-Alias" log entries
+- Check log files for "Send-As-Alias" entries
 
 **Routing not working:**
+- Enable file logging with `Debug` level to see rule matching
 - Verify Send Connector exists with matching address space
 - Check if recipient is in local domains (bypassed by default)
-- Check Event Viewer for "Sender-Based Routing" log entries
 - Use the "Test Rules" feature in the configurator to debug
 
 **Wildcards not matching:**
 - Ensure pattern format is correct (e.g., `*.domain.com` not `*domain.com`)
 - Use the "Test Rules" feature to verify pattern matching
+- Enable `Verbose` logging to see detailed pattern matching
+
+**Log files not appearing:**
+- Verify `enableFileLogging` is set to `true`
+- Check the configured log path exists and is writable
+- Restart MSExchangeTransport service after config changes
 
 ## License
 

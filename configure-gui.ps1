@@ -90,6 +90,13 @@ function Load-Configuration {
             ValidateProxyAddresses = $true
             BlockIfNoAlias = $false
         }
+        Logging = @{
+            EnableFileLogging = $false
+            LogLevel = "Info"
+            LogPath = ""
+            MaxLogFileSizeMB = 10
+            MaxLogFiles = 5
+        }
         LocalDomains = @()
         Rules = @()
     }
@@ -120,6 +127,25 @@ function Load-Configuration {
             }
             if ($root.settings.blockIfNoAlias) {
                 $config.Settings.BlockIfNoAlias = [bool]::Parse($root.settings.blockIfNoAlias)
+            }
+        }
+
+        # Load logging settings
+        if ($root.logging) {
+            if ($root.logging.enableFileLogging) {
+                $config.Logging.EnableFileLogging = [bool]::Parse($root.logging.enableFileLogging)
+            }
+            if ($root.logging.logLevel) {
+                $config.Logging.LogLevel = $root.logging.logLevel
+            }
+            if ($root.logging.logPath) {
+                $config.Logging.LogPath = $root.logging.logPath
+            }
+            if ($root.logging.maxLogFileSizeMB) {
+                $config.Logging.MaxLogFileSizeMB = [int]$root.logging.maxLogFileSizeMB
+            }
+            if ($root.logging.maxLogFiles) {
+                $config.Logging.MaxLogFiles = [int]$root.logging.maxLogFiles
             }
         }
 
@@ -179,6 +205,14 @@ function Save-Configuration {
     <validateProxyAddresses>$($Config.Settings.ValidateProxyAddresses.ToString().ToLower())</validateProxyAddresses>
     <blockIfNoAlias>$($Config.Settings.BlockIfNoAlias.ToString().ToLower())</blockIfNoAlias>
   </settings>
+
+  <logging>
+    <enableFileLogging>$($Config.Logging.EnableFileLogging.ToString().ToLower())</enableFileLogging>
+    <logLevel>$($Config.Logging.LogLevel)</logLevel>
+    <logPath>$($Config.Logging.LogPath)</logPath>
+    <maxLogFileSizeMB>$($Config.Logging.MaxLogFileSizeMB)</maxLogFileSizeMB>
+    <maxLogFiles>$($Config.Logging.MaxLogFiles)</maxLogFiles>
+  </logging>
 
   <localDomains>
 "@
@@ -911,6 +945,200 @@ $tabSettings.Controls.AddRange(@(
     $grpProxyValidation
 ))
 
+# ============= LOGGING TAB =============
+$tabLogging = New-Object System.Windows.Forms.TabPage
+$tabLogging.Text = "Logging"
+$tabLogging.Padding = New-Object System.Windows.Forms.Padding(20)
+
+$chkEnableFileLogging = New-Object System.Windows.Forms.CheckBox
+$chkEnableFileLogging.Text = "Enable File Logging"
+$chkEnableFileLogging.Location = New-Object System.Drawing.Point(20, 20)
+$chkEnableFileLogging.Size = New-Object System.Drawing.Size(200, 24)
+$chkEnableFileLogging.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
+
+$lblFileLoggingHelp = New-Object System.Windows.Forms.Label
+$lblFileLoggingHelp.Text = "Write detailed logs to a text file for troubleshooting"
+$lblFileLoggingHelp.Location = New-Object System.Drawing.Point(35, 44)
+$lblFileLoggingHelp.Size = New-Object System.Drawing.Size(400, 20)
+$lblFileLoggingHelp.ForeColor = [System.Drawing.Color]::Gray
+
+$lblLogLevel = New-Object System.Windows.Forms.Label
+$lblLogLevel.Text = "Log Level:"
+$lblLogLevel.Location = New-Object System.Drawing.Point(20, 80)
+$lblLogLevel.Size = New-Object System.Drawing.Size(80, 23)
+
+$cmbLogLevel = New-Object System.Windows.Forms.ComboBox
+$cmbLogLevel.Location = New-Object System.Drawing.Point(110, 77)
+$cmbLogLevel.Size = New-Object System.Drawing.Size(150, 23)
+$cmbLogLevel.DropDownStyle = "DropDownList"
+$cmbLogLevel.Items.AddRange(@("None", "Error", "Warning", "Info", "Debug", "Verbose"))
+
+$lblLogLevelHelp = New-Object System.Windows.Forms.Label
+$lblLogLevelHelp.Text = "None < Error < Warning < Info < Debug < Verbose (most detailed)"
+$lblLogLevelHelp.Location = New-Object System.Drawing.Point(270, 80)
+$lblLogLevelHelp.Size = New-Object System.Drawing.Size(400, 20)
+$lblLogLevelHelp.ForeColor = [System.Drawing.Color]::Gray
+
+$lblLogPath = New-Object System.Windows.Forms.Label
+$lblLogPath.Text = "Log Path:"
+$lblLogPath.Location = New-Object System.Drawing.Point(20, 120)
+$lblLogPath.Size = New-Object System.Drawing.Size(80, 23)
+
+$txtLogPath = New-Object System.Windows.Forms.TextBox
+$txtLogPath.Location = New-Object System.Drawing.Point(110, 117)
+$txtLogPath.Size = New-Object System.Drawing.Size(400, 23)
+
+$btnBrowseLogPath = New-Object System.Windows.Forms.Button
+$btnBrowseLogPath.Text = "Browse..."
+$btnBrowseLogPath.Location = New-Object System.Drawing.Point(520, 115)
+$btnBrowseLogPath.Size = New-Object System.Drawing.Size(80, 27)
+
+$lblLogPathHelp = New-Object System.Windows.Forms.Label
+$lblLogPathHelp.Text = "Leave empty for default: Exchange TransportRoles\Logs\AdvancedSenderRouting\"
+$lblLogPathHelp.Location = New-Object System.Drawing.Point(110, 143)
+$lblLogPathHelp.Size = New-Object System.Drawing.Size(500, 20)
+$lblLogPathHelp.ForeColor = [System.Drawing.Color]::Gray
+
+$lblMaxFileSize = New-Object System.Windows.Forms.Label
+$lblMaxFileSize.Text = "Max File Size (MB):"
+$lblMaxFileSize.Location = New-Object System.Drawing.Point(20, 180)
+$lblMaxFileSize.Size = New-Object System.Drawing.Size(120, 23)
+
+$numMaxFileSize = New-Object System.Windows.Forms.NumericUpDown
+$numMaxFileSize.Location = New-Object System.Drawing.Point(150, 177)
+$numMaxFileSize.Size = New-Object System.Drawing.Size(80, 23)
+$numMaxFileSize.Minimum = 1
+$numMaxFileSize.Maximum = 1000
+$numMaxFileSize.Value = 10
+
+$lblMaxFileSizeHelp = New-Object System.Windows.Forms.Label
+$lblMaxFileSizeHelp.Text = "Log file will be rotated when it reaches this size"
+$lblMaxFileSizeHelp.Location = New-Object System.Drawing.Point(240, 180)
+$lblMaxFileSizeHelp.Size = New-Object System.Drawing.Size(350, 20)
+$lblMaxFileSizeHelp.ForeColor = [System.Drawing.Color]::Gray
+
+$lblMaxLogFiles = New-Object System.Windows.Forms.Label
+$lblMaxLogFiles.Text = "Max Log Files:"
+$lblMaxLogFiles.Location = New-Object System.Drawing.Point(20, 220)
+$lblMaxLogFiles.Size = New-Object System.Drawing.Size(120, 23)
+
+$numMaxLogFiles = New-Object System.Windows.Forms.NumericUpDown
+$numMaxLogFiles.Location = New-Object System.Drawing.Point(150, 217)
+$numMaxLogFiles.Size = New-Object System.Drawing.Size(80, 23)
+$numMaxLogFiles.Minimum = 1
+$numMaxLogFiles.Maximum = 100
+$numMaxLogFiles.Value = 5
+
+$lblMaxLogFilesHelp = New-Object System.Windows.Forms.Label
+$lblMaxLogFilesHelp.Text = "Number of rotated log files to keep (older files are deleted)"
+$lblMaxLogFilesHelp.Location = New-Object System.Drawing.Point(240, 220)
+$lblMaxLogFilesHelp.Size = New-Object System.Drawing.Size(400, 20)
+$lblMaxLogFilesHelp.ForeColor = [System.Drawing.Color]::Gray
+
+$grpLogActions = New-Object System.Windows.Forms.GroupBox
+$grpLogActions.Text = "Log Actions"
+$grpLogActions.Location = New-Object System.Drawing.Point(20, 270)
+$grpLogActions.Size = New-Object System.Drawing.Size(600, 80)
+
+$btnViewLog = New-Object System.Windows.Forms.Button
+$btnViewLog.Text = "View Log File"
+$btnViewLog.Location = New-Object System.Drawing.Point(20, 30)
+$btnViewLog.Size = New-Object System.Drawing.Size(120, 30)
+
+$btnOpenLogFolder = New-Object System.Windows.Forms.Button
+$btnOpenLogFolder.Text = "Open Log Folder"
+$btnOpenLogFolder.Location = New-Object System.Drawing.Point(160, 30)
+$btnOpenLogFolder.Size = New-Object System.Drawing.Size(120, 30)
+
+$btnClearLogs = New-Object System.Windows.Forms.Button
+$btnClearLogs.Text = "Clear Log Files"
+$btnClearLogs.Location = New-Object System.Drawing.Point(300, 30)
+$btnClearLogs.Size = New-Object System.Drawing.Size(120, 30)
+
+$grpLogActions.Controls.AddRange(@($btnViewLog, $btnOpenLogFolder, $btnClearLogs))
+
+# Logging event handlers
+$btnBrowseLogPath.Add_Click({
+    $folderBrowser = New-Object System.Windows.Forms.FolderBrowserDialog
+    $folderBrowser.Description = "Select log folder"
+    if ($folderBrowser.ShowDialog() -eq "OK") {
+        $txtLogPath.Text = $folderBrowser.SelectedPath
+    }
+})
+
+$btnViewLog.Add_Click({
+    $logDir = if ($txtLogPath.Text) { $txtLogPath.Text } else {
+        $exchangePath = [Environment]::GetEnvironmentVariable("ExchangeInstallPath")
+        if ($exchangePath) {
+            Join-Path $exchangePath "TransportRoles\Logs\AdvancedSenderRouting"
+        } else {
+            "C:\Program Files\Microsoft\Exchange Server\V15\TransportRoles\Logs\AdvancedSenderRouting"
+        }
+    }
+    $logFile = Join-Path $logDir "AdvancedSenderRouting.log"
+    if (Test-Path $logFile) {
+        Start-Process notepad.exe -ArgumentList $logFile
+    } else {
+        [System.Windows.Forms.MessageBox]::Show("Log file not found: $logFile", "Not Found", "OK", "Information")
+    }
+})
+
+$btnOpenLogFolder.Add_Click({
+    $logDir = if ($txtLogPath.Text) { $txtLogPath.Text } else {
+        $exchangePath = [Environment]::GetEnvironmentVariable("ExchangeInstallPath")
+        if ($exchangePath) {
+            Join-Path $exchangePath "TransportRoles\Logs\AdvancedSenderRouting"
+        } else {
+            "C:\Program Files\Microsoft\Exchange Server\V15\TransportRoles\Logs\AdvancedSenderRouting"
+        }
+    }
+    if (Test-Path $logDir) {
+        Start-Process explorer.exe -ArgumentList $logDir
+    } else {
+        [System.Windows.Forms.MessageBox]::Show("Log folder does not exist yet: $logDir", "Not Found", "OK", "Information")
+    }
+})
+
+$btnClearLogs.Add_Click({
+    $result = [System.Windows.Forms.MessageBox]::Show(
+        "Delete all AdvancedSenderRouting log files?",
+        "Confirm Delete",
+        "YesNo",
+        "Warning"
+    )
+    if ($result -eq "Yes") {
+        $logDir = if ($txtLogPath.Text) { $txtLogPath.Text } else {
+            $exchangePath = [Environment]::GetEnvironmentVariable("ExchangeInstallPath")
+            if ($exchangePath) {
+                Join-Path $exchangePath "TransportRoles\Logs\AdvancedSenderRouting"
+            } else {
+                "C:\Program Files\Microsoft\Exchange Server\V15\TransportRoles\Logs\AdvancedSenderRouting"
+            }
+        }
+        if (Test-Path $logDir) {
+            Get-ChildItem $logDir -Filter "AdvancedSenderRouting*.log" -ErrorAction SilentlyContinue | Remove-Item -Force
+            [System.Windows.Forms.MessageBox]::Show("Log files cleared.", "Success", "OK", "Information")
+        }
+    }
+})
+
+$tabLogging.Controls.AddRange(@(
+    $chkEnableFileLogging, $lblFileLoggingHelp,
+    $lblLogLevel, $cmbLogLevel, $lblLogLevelHelp,
+    $lblLogPath, $txtLogPath, $btnBrowseLogPath, $lblLogPathHelp,
+    $lblMaxFileSize, $numMaxFileSize, $lblMaxFileSizeHelp,
+    $lblMaxLogFiles, $numMaxLogFiles, $lblMaxLogFilesHelp,
+    $grpLogActions
+))
+
+# Initialize logging controls from config
+$chkEnableFileLogging.Checked = $config.Logging.EnableFileLogging
+$cmbLogLevel.SelectedItem = $config.Logging.LogLevel
+if (-not $cmbLogLevel.SelectedItem) { $cmbLogLevel.SelectedItem = "Info" }
+$txtLogPath.Text = $config.Logging.LogPath
+$numMaxFileSize.Value = $config.Logging.MaxLogFileSizeMB
+$numMaxLogFiles.Value = $config.Logging.MaxLogFiles
+
 # ============= LOCAL DOMAINS TAB =============
 $tabDomains = New-Object System.Windows.Forms.TabPage
 $tabDomains.Text = "Local Domains"
@@ -1232,7 +1460,7 @@ $txtHelp.Text = $helpText -replace "`n", "`r`n"
 $tabHelp.Controls.Add($txtHelp)
 
 # Add tabs
-$tabControl.TabPages.AddRange(@($tabRules, $tabValidation, $tabSettings, $tabDomains, $tabHelp))
+$tabControl.TabPages.AddRange(@($tabRules, $tabValidation, $tabSettings, $tabLogging, $tabDomains, $tabHelp))
 
 # Bottom buttons
 $lblConfigPath = New-Object System.Windows.Forms.Label
@@ -1251,7 +1479,13 @@ $btnReload.Text = "Reload"
 $btnReload.Location = New-Object System.Drawing.Point(690, 665)
 $btnReload.Size = New-Object System.Drawing.Size(80, 35)
 
-$form.Controls.AddRange(@($tabControl, $lblConfigPath, $btnSave, $btnReload))
+$btnRestartTransport = New-Object System.Windows.Forms.Button
+$btnRestartTransport.Text = "Restart Transport"
+$btnRestartTransport.Location = New-Object System.Drawing.Point(550, 665)
+$btnRestartTransport.Size = New-Object System.Drawing.Size(130, 35)
+$btnRestartTransport.BackColor = [System.Drawing.Color]::FromArgb(255, 200, 200)
+
+$form.Controls.AddRange(@($tabControl, $lblConfigPath, $btnSave, $btnReload, $btnRestartTransport))
 
 # ============= EVENT HANDLERS =============
 
@@ -1730,6 +1964,40 @@ $btnSave.Add_Click({
     $config.Settings.ValidateProxyAddresses = $chkValidateProxy.Checked
     $config.Settings.BlockIfNoAlias = $chkBlockNoAlias.Checked
 
+    # Update logging settings
+    $config.Logging.EnableFileLogging = $chkEnableFileLogging.Checked
+    $config.Logging.LogLevel = $cmbLogLevel.SelectedItem
+    $config.Logging.LogPath = $txtLogPath.Text
+    $config.Logging.MaxLogFileSizeMB = [int]$numMaxFileSize.Value
+    $config.Logging.MaxLogFiles = [int]$numMaxLogFiles.Value
+
+    # Create log folder if logging is enabled
+    if ($chkEnableFileLogging.Checked) {
+        $logPath = $txtLogPath.Text
+        if ([string]::IsNullOrWhiteSpace($logPath)) {
+            # Use default Exchange log path
+            $exchangePath = $null
+            $regPaths = @("HKLM:\SOFTWARE\Microsoft\ExchangeServer\v15\Setup", "HKLM:\SOFTWARE\Microsoft\ExchangeServer\v14\Setup")
+            foreach ($regPath in $regPaths) {
+                if (Test-Path $regPath) {
+                    $exchangePath = (Get-ItemProperty $regPath -ErrorAction SilentlyContinue).MsiInstallPath
+                    if ($exchangePath) { break }
+                }
+            }
+            if (-not $exchangePath) { $exchangePath = "C:\Program Files\Microsoft\Exchange Server\V15" }
+            $logPath = Join-Path $exchangePath.TrimEnd('\') "TransportRoles\Logs\AdvancedSenderRouting"
+        }
+        if ($logPath -and -not (Test-Path $logPath)) {
+            try {
+                New-Item -Path $logPath -ItemType Directory -Force | Out-Null
+                [System.Windows.Forms.MessageBox]::Show("Created log folder:`n$logPath", "Info", "OK", "Information")
+            }
+            catch {
+                [System.Windows.Forms.MessageBox]::Show("Failed to create log folder:`n$logPath`n`nError: $_", "Warning", "OK", "Warning")
+            }
+        }
+    }
+
     if (-not $configFile) {
         $saveDialog = New-Object System.Windows.Forms.SaveFileDialog
         $saveDialog.Filter = "XML files (*.xml)|*.xml"
@@ -1760,6 +2028,13 @@ $btnReload.Add_Click({
         $chkValidateProxy.Checked = $config.Settings.ValidateProxyAddresses
         $chkBlockNoAlias.Checked = $config.Settings.BlockIfNoAlias
 
+        # Refresh logging controls
+        $chkEnableFileLogging.Checked = $config.Logging.EnableFileLogging
+        $cmbLogLevel.SelectedItem = $config.Logging.LogLevel
+        $txtLogPath.Text = $config.Logging.LogPath
+        $numMaxFileSize.Value = $config.Logging.MaxLogFileSizeMB
+        $numMaxLogFiles.Value = $config.Logging.MaxLogFiles
+
         # Refresh connector dropdown
         $cboConnector.Items.Clear()
         $cboConnector.Items.Add("-- Create New Connector --")
@@ -1773,6 +2048,37 @@ $btnReload.Add_Click({
         Clear-RuleForm
 
         [System.Windows.Forms.MessageBox]::Show("Configuration reloaded", "Info", "OK", "Information")
+    }
+})
+
+# Restart Transport Service
+$btnRestartTransport.Add_Click({
+    $result = [System.Windows.Forms.MessageBox]::Show(
+        "Are you sure you want to restart the MSExchangeTransport service?`n`nThis will temporarily interrupt mail flow.",
+        "Confirm Restart",
+        "YesNo",
+        "Warning"
+    )
+
+    if ($result -eq "Yes") {
+        try {
+            $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor
+            $btnRestartTransport.Enabled = $false
+            $btnRestartTransport.Text = "Restarting..."
+            $form.Refresh()
+
+            Restart-Service MSExchangeTransport -Force -ErrorAction Stop
+
+            [System.Windows.Forms.MessageBox]::Show("MSExchangeTransport service restarted successfully.", "Success", "OK", "Information")
+        }
+        catch {
+            [System.Windows.Forms.MessageBox]::Show("Failed to restart service:`n`n$_", "Error", "OK", "Error")
+        }
+        finally {
+            $form.Cursor = [System.Windows.Forms.Cursors]::Default
+            $btnRestartTransport.Enabled = $true
+            $btnRestartTransport.Text = "Restart Transport"
+        }
     }
 })
 

@@ -18,6 +18,7 @@ namespace AdvancedSenderRouting
     public sealed class AdvancedSenderRoutingAgent : RoutingAgent
     {
         private readonly RoutingConfiguration _config;
+        private readonly FileLogger _fileLogger;
 
         public AdvancedSenderRoutingAgent(RoutingConfiguration config)
         {
@@ -25,6 +26,10 @@ namespace AdvancedSenderRouting
                 throw new ArgumentNullException("config");
 
             _config = config;
+
+            // Initialize file logger
+            _fileLogger = FileLogger.Instance;
+            _fileLogger.Initialize(config);
 
             // Subscribe to OnResolvedMessage event - fires after recipient resolution
             OnResolvedMessage += ResolvedMessageHandler;
@@ -489,8 +494,15 @@ namespace AdvancedSenderRouting
             return null;
         }
 
-        private static void LogInfo(string message)
+        private void LogInfo(string message)
         {
+            // Write to file log
+            if (_fileLogger != null)
+            {
+                _fileLogger.LogInfo(message);
+            }
+
+            // Write to Event Log
             try
             {
                 System.Diagnostics.EventLog.WriteEntry(
@@ -502,8 +514,15 @@ namespace AdvancedSenderRouting
             catch { }
         }
 
-        private static void LogWarning(string message)
+        private void LogWarning(string message)
         {
+            // Write to file log
+            if (_fileLogger != null)
+            {
+                _fileLogger.LogWarning(message);
+            }
+
+            // Write to Event Log
             try
             {
                 System.Diagnostics.EventLog.WriteEntry(
@@ -515,8 +534,15 @@ namespace AdvancedSenderRouting
             catch { }
         }
 
-        private static void LogError(string message)
+        private void LogError(string message)
         {
+            // Write to file log
+            if (_fileLogger != null)
+            {
+                _fileLogger.LogError(message);
+            }
+
+            // Write to Event Log
             try
             {
                 System.Diagnostics.EventLog.WriteEntry(
@@ -526,6 +552,24 @@ namespace AdvancedSenderRouting
                     1001);
             }
             catch { }
+        }
+
+        private void LogDebug(string message)
+        {
+            // Write to file log only (debug level not written to Event Log)
+            if (_fileLogger != null)
+            {
+                _fileLogger.LogDebug(message);
+            }
+        }
+
+        private void LogVerbose(string message)
+        {
+            // Write to file log only (verbose level not written to Event Log)
+            if (_fileLogger != null)
+            {
+                _fileLogger.LogVerbose(message);
+            }
         }
     }
 }

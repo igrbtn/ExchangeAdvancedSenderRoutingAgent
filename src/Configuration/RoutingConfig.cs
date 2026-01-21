@@ -7,6 +7,19 @@ using System.Xml.Linq;
 namespace AdvancedSenderRouting
 {
     /// <summary>
+    /// Log level for file logging
+    /// </summary>
+    public enum LogLevel
+    {
+        None = 0,
+        Error = 1,
+        Warning = 2,
+        Info = 3,
+        Debug = 4,
+        Verbose = 5
+    }
+
+    /// <summary>
     /// Configuration for Advanced Sender Based Routing Agent.
     /// Supports advanced routing rules with sender and recipient conditions,
     /// wildcard matching, and send-as-alias features.
@@ -23,6 +36,13 @@ namespace AdvancedSenderRouting
         private bool _blockIfNoAlias = false;
         private List<RoutingRule> _routingRules = new List<RoutingRule>();
         private List<string> _localDomains = new List<string>();
+
+        // Logging settings
+        private bool _enableFileLogging = false;
+        private LogLevel _logLevel = LogLevel.Info;
+        private string _logPath = null;
+        private int _maxLogFileSizeMB = 10;
+        private int _maxLogFiles = 5;
 
         public bool EnableSendAsAlias
         {
@@ -70,6 +90,51 @@ namespace AdvancedSenderRouting
         {
             get { return _blockIfNoAlias; }
             set { _blockIfNoAlias = value; }
+        }
+
+        /// <summary>
+        /// Enable logging to text file
+        /// </summary>
+        public bool EnableFileLogging
+        {
+            get { return _enableFileLogging; }
+            set { _enableFileLogging = value; }
+        }
+
+        /// <summary>
+        /// Log level (None, Error, Warning, Info, Debug, Verbose)
+        /// </summary>
+        public LogLevel FileLogLevel
+        {
+            get { return _logLevel; }
+            set { _logLevel = value; }
+        }
+
+        /// <summary>
+        /// Path to log file directory. If null, uses Exchange transport logs folder.
+        /// </summary>
+        public string LogPath
+        {
+            get { return _logPath; }
+            set { _logPath = value; }
+        }
+
+        /// <summary>
+        /// Maximum log file size in megabytes before rotation
+        /// </summary>
+        public int MaxLogFileSizeMB
+        {
+            get { return _maxLogFileSizeMB; }
+            set { _maxLogFileSizeMB = value > 0 ? value : 10; }
+        }
+
+        /// <summary>
+        /// Maximum number of log files to keep (rotation)
+        /// </summary>
+        public int MaxLogFiles
+        {
+            get { return _maxLogFiles; }
+            set { _maxLogFiles = value > 0 ? value : 5; }
         }
 
         public List<string> LocalDomains
@@ -140,6 +205,53 @@ namespace AdvancedSenderRouting
                     config.BlockIfNoAlias = ParseBool(
                         blockIfNoAliasElement != null ? blockIfNoAliasElement.Value : null,
                         false);
+                }
+
+                // Parse logging settings
+                var loggingElement = root.Element("logging");
+                if (loggingElement != null)
+                {
+                    var enableFileLoggingElement = loggingElement.Element("enableFileLogging");
+                    var logLevelElement = loggingElement.Element("logLevel");
+                    var logPathElement = loggingElement.Element("logPath");
+                    var maxLogFileSizeMBElement = loggingElement.Element("maxLogFileSizeMB");
+                    var maxLogFilesElement = loggingElement.Element("maxLogFiles");
+
+                    config.EnableFileLogging = ParseBool(
+                        enableFileLoggingElement != null ? enableFileLoggingElement.Value : null,
+                        false);
+
+                    if (logLevelElement != null && !string.IsNullOrEmpty(logLevelElement.Value))
+                    {
+                        LogLevel level;
+                        if (Enum.TryParse(logLevelElement.Value, true, out level))
+                        {
+                            config.FileLogLevel = level;
+                        }
+                    }
+
+                    if (logPathElement != null && !string.IsNullOrEmpty(logPathElement.Value))
+                    {
+                        config.LogPath = logPathElement.Value;
+                    }
+
+                    if (maxLogFileSizeMBElement != null)
+                    {
+                        int size;
+                        if (int.TryParse(maxLogFileSizeMBElement.Value, out size) && size > 0)
+                        {
+                            config.MaxLogFileSizeMB = size;
+                        }
+                    }
+
+                    if (maxLogFilesElement != null)
+                    {
+                        int count;
+                        if (int.TryParse(maxLogFilesElement.Value, out count) && count > 0)
+                        {
+                            config.MaxLogFiles = count;
+                        }
+                    }
                 }
 
                 // Parse local domains for bypass
@@ -501,6 +613,208 @@ namespace AdvancedSenderRouting
             catch
             {
                 return false;
+            }
+        }
+    }
+
+    /// <summary>
+    /// File logger with rotation support
+    /// </summary>
+    public class FileLogger
+    {
+        private static FileLogger _instance;
+        private static readonly object _lock = new object();
+        private RoutingConfiguration _config;
+        private string _logFilePath;
+        private bool _initialized = false;
+
+        private FileLogger() { }
+
+        public static FileLogger Instance
+        {
+            get
+            {
+                if (_instance == null)
+                {
+                    lock (_lock)
+                    {
+                        if (_instance == null)
+                        {
+                            _instance = new FileLogger();
+                        }
+                    }
+                }
+                return _instance;
+            }
+        }
+
+        public void Initialize(RoutingConfiguration config)
+        {
+            lock (_lock)
+            {
+                _config = config;
+
+                if (!config.EnableFileLogging)
+                {
+                    _initialized = false;
+                    return;
+                }
+
+                try
+                {
+                    // Determine log path
+                    string logDir = config.LogPath;
+
+                    if (string.IsNullOrEmpty(logDir))
+                    {
+                        // Default to Exchange transport logs folder
+                        var exchangePath = Environment.GetEnvironmentVariable("ExchangeInstallPath");
+                        if (!string.IsNullOrEmpty(exchangePath))
+                        {
+                            logDir = Path.Combine(exchangePath, "TransportRoles", "Logs", "AdvancedSenderRouting");
+                        }
+                        else
+                        {
+                            // Fallback to agent directory
+                            var assemblyPath = Assembly.GetExecutingAssembly().Location;
+                            logDir = Path.Combine(Path.GetDirectoryName(assemblyPath), "Logs");
+                        }
+                    }
+
+                    // Create directory if it doesn't exist
+                    if (!Directory.Exists(logDir))
+                    {
+                        Directory.CreateDirectory(logDir);
+                    }
+
+                    _logFilePath = Path.Combine(logDir, "AdvancedSenderRouting.log");
+                    _initialized = true;
+
+                    // Log initialization
+                    WriteLog(LogLevel.Info, "File logging initialized. Path: " + _logFilePath);
+                }
+                catch (Exception ex)
+                {
+                    _initialized = false;
+                    // Log to event log as fallback
+                    try
+                    {
+                        System.Diagnostics.EventLog.WriteEntry(
+                            "MSExchangeTransport",
+                            "AdvancedSenderRouting: Failed to initialize file logging: " + ex.Message,
+                            System.Diagnostics.EventLogEntryType.Warning,
+                            1002);
+                    }
+                    catch { }
+                }
+            }
+        }
+
+        public void Log(LogLevel level, string message)
+        {
+            if (!_initialized || _config == null || !_config.EnableFileLogging)
+                return;
+
+            if (level > _config.FileLogLevel || _config.FileLogLevel == LogLevel.None)
+                return;
+
+            WriteLog(level, message);
+        }
+
+        public void LogError(string message)
+        {
+            Log(LogLevel.Error, message);
+        }
+
+        public void LogWarning(string message)
+        {
+            Log(LogLevel.Warning, message);
+        }
+
+        public void LogInfo(string message)
+        {
+            Log(LogLevel.Info, message);
+        }
+
+        public void LogDebug(string message)
+        {
+            Log(LogLevel.Debug, message);
+        }
+
+        public void LogVerbose(string message)
+        {
+            Log(LogLevel.Verbose, message);
+        }
+
+        private void WriteLog(LogLevel level, string message)
+        {
+            lock (_lock)
+            {
+                try
+                {
+                    // Check file size and rotate if needed
+                    RotateLogIfNeeded();
+
+                    // Write log entry
+                    var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+                    var logEntry = string.Format("[{0}] [{1}] {2}", timestamp, level.ToString().ToUpper(), message);
+
+                    using (var writer = new StreamWriter(_logFilePath, true))
+                    {
+                        writer.WriteLine(logEntry);
+                    }
+                }
+                catch
+                {
+                    // Silently fail - don't break email flow for logging issues
+                }
+            }
+        }
+
+        private void RotateLogIfNeeded()
+        {
+            try
+            {
+                if (!File.Exists(_logFilePath))
+                    return;
+
+                var fileInfo = new FileInfo(_logFilePath);
+                var maxSizeBytes = _config.MaxLogFileSizeMB * 1024L * 1024L;
+
+                if (fileInfo.Length < maxSizeBytes)
+                    return;
+
+                // Rotate files
+                var logDir = Path.GetDirectoryName(_logFilePath);
+                var logName = Path.GetFileNameWithoutExtension(_logFilePath);
+                var logExt = Path.GetExtension(_logFilePath);
+
+                // Delete oldest file if at max
+                var oldestFile = Path.Combine(logDir, string.Format("{0}.{1}{2}", logName, _config.MaxLogFiles, logExt));
+                if (File.Exists(oldestFile))
+                {
+                    File.Delete(oldestFile);
+                }
+
+                // Rotate existing files
+                for (int i = _config.MaxLogFiles - 1; i >= 1; i--)
+                {
+                    var currentFile = Path.Combine(logDir, string.Format("{0}.{1}{2}", logName, i, logExt));
+                    var nextFile = Path.Combine(logDir, string.Format("{0}.{1}{2}", logName, i + 1, logExt));
+
+                    if (File.Exists(currentFile))
+                    {
+                        File.Move(currentFile, nextFile);
+                    }
+                }
+
+                // Rename current log to .1
+                var firstBackup = Path.Combine(logDir, string.Format("{0}.1{1}", logName, logExt));
+                File.Move(_logFilePath, firstBackup);
+            }
+            catch
+            {
+                // Silently fail rotation
             }
         }
     }

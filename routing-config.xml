@@ -58,6 +58,26 @@
   </settings>
 
   <!--
+    Logging Settings
+    ================
+    Enable file logging for debugging and troubleshooting.
+    Log levels: None, Error, Warning, Info, Debug, Verbose
+    Default location: Exchange transport logs folder
+  -->
+  <logging>
+    <!-- Enable/disable file logging -->
+    <enableFileLogging>false</enableFileLogging>
+    <!-- Log level: None, Error, Warning, Info, Debug, Verbose -->
+    <logLevel>Info</logLevel>
+    <!-- Custom log path (leave empty for default Exchange logs folder) -->
+    <logPath></logPath>
+    <!-- Maximum log file size in MB before rotation -->
+    <maxLogFileSizeMB>10</maxLogFileSizeMB>
+    <!-- Number of rotated log files to keep -->
+    <maxLogFiles>5</maxLogFiles>
+  </logging>
+
+  <!--
     Local domains - recipients in these domains will be delivered directly
     (not routed through sender-based rules when bypassLocalRecipients=true)
   -->

@@ -32,6 +32,43 @@
   </settings>
 
   <!--
+    Logging Settings
+    ================
+    Enable file logging for debugging and troubleshooting.
+
+    Log levels (in order of verbosity):
+    - None:    No logging
+    - Error:   Only errors
+    - Warning: Errors and warnings
+    - Info:    Normal operation messages (default)
+    - Debug:   Detailed debugging information
+    - Verbose: All messages including very detailed tracing
+
+    Default log location:
+    C:\Program Files\Microsoft\Exchange Server\V15\TransportRoles\Logs\AdvancedSenderRouting\
+
+    Log rotation: When file reaches maxLogFileSizeMB, it's renamed to .1, .2, etc.
+    Old files beyond maxLogFiles are deleted automatically.
+  -->
+  <logging>
+    <!-- Enable/disable file logging (default: false) -->
+    <enableFileLogging>true</enableFileLogging>
+
+    <!-- Log level: None, Error, Warning, Info, Debug, Verbose (default: Info) -->
+    <logLevel>Info</logLevel>
+
+    <!-- Custom log path (leave empty for default Exchange logs folder) -->
+    <!-- Example: C:\Logs\AdvancedSenderRouting -->
+    <logPath></logPath>
+
+    <!-- Maximum log file size in MB before rotation (default: 10) -->
+    <maxLogFileSizeMB>10</maxLogFileSizeMB>
+
+    <!-- Number of rotated log files to keep (default: 5) -->
+    <maxLogFiles>5</maxLogFiles>
+  </logging>
+
+  <!--
     Local domains - recipients here bypass routing rules
     (when bypassLocalRecipients=true)
   -->

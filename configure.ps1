@@ -254,6 +254,34 @@ function Update-ConfigurationSchema {
         $updated = $true
     }
 
+    # Add logging section if missing
+    if (-not $Script:Config.configuration.SelectSingleNode("logging")) {
+        $logging = $Script:Config.CreateElement("logging")
+
+        $enableFileLogging = $Script:Config.CreateElement("enableFileLogging")
+        $enableFileLogging.InnerText = "false"
+        $logging.AppendChild($enableFileLogging) | Out-Null
+
+        $logLevel = $Script:Config.CreateElement("logLevel")
+        $logLevel.InnerText = "Info"
+        $logging.AppendChild($logLevel) | Out-Null
+
+        $logPath = $Script:Config.CreateElement("logPath")
+        $logPath.InnerText = ""
+        $logging.AppendChild($logPath) | Out-Null
+
+        $maxLogFileSizeMB = $Script:Config.CreateElement("maxLogFileSizeMB")
+        $maxLogFileSizeMB.InnerText = "10"
+        $logging.AppendChild($maxLogFileSizeMB) | Out-Null
+
+        $maxLogFiles = $Script:Config.CreateElement("maxLogFiles")
+        $maxLogFiles.InnerText = "5"
+        $logging.AppendChild($maxLogFiles) | Out-Null
+
+        $Script:Config.configuration.AppendChild($logging) | Out-Null
+        $updated = $true
+    }
+
     if ($updated) { Save-Configuration | Out-Null }
 }
 
@@ -326,6 +354,57 @@ function Get-LocalDomains {
         }
     }
     return $domains
+}
+
+function Get-LoggingSetting {
+    param([string]$SettingName)
+    $logging = $Script:Config.configuration.SelectSingleNode("logging")
+    if ($logging) {
+        $element = $logging.SelectSingleNode($SettingName)
+        if ($element) { return $element.InnerText }
+    }
+    # Defaults
+    switch ($SettingName) {
+        "enableFileLogging" { return "false" }
+        "logLevel" { return "Info" }
+        "logPath" { return "" }
+        "maxLogFileSizeMB" { return "10" }
+        "maxLogFiles" { return "5" }
+    }
+    return ""
+}
+
+function Set-LoggingSetting {
+    param([string]$SettingName, [string]$Value)
+    $logging = $Script:Config.configuration.SelectSingleNode("logging")
+    if (-not $logging) {
+        $logging = $Script:Config.CreateElement("logging")
+        $Script:Config.configuration.AppendChild($logging) | Out-Null
+    }
+    $element = $logging.SelectSingleNode($SettingName)
+    if (-not $element) {
+        $element = $Script:Config.CreateElement($SettingName)
+        $logging.AppendChild($element) | Out-Null
+    }
+    $element.InnerText = $Value
+}
+
+function Get-DefaultLogPath {
+    $exchangePath = $null
+    $regPaths = @(
+        "HKLM:\SOFTWARE\Microsoft\ExchangeServer\v15\Setup",
+        "HKLM:\SOFTWARE\Microsoft\ExchangeServer\v14\Setup"
+    )
+    foreach ($regPath in $regPaths) {
+        if (Test-Path $regPath) {
+            $exchangePath = (Get-ItemProperty $regPath -ErrorAction SilentlyContinue).MsiInstallPath
+            if ($exchangePath) { break }
+        }
+    }
+    if ($exchangePath) {
+        return Join-Path $exchangePath "TransportRoles\Logs\AdvancedSenderRouting"
+    }
+    return "C:\Program Files\Microsoft\Exchange Server\V15\TransportRoles\Logs\AdvancedSenderRouting"
 }
 
 function New-RoutingConnector {
@@ -495,10 +574,11 @@ function Show-MainMenu {
         Write-MenuOption "2" "Test Rules"
         Write-MenuOption "3" "Settings"
         Write-MenuOption "4" "Local Domains"
-        Write-MenuOption "5" "Manage Connectors"
-        Write-MenuOption "6" "View Configuration (XML)"
-        Write-MenuOption "7" "Backup/Restore"
-        Write-MenuOption "8" "Restart Transport Service"
+        Write-MenuOption "5" "Logging"
+        Write-MenuOption "6" "Manage Connectors"
+        Write-MenuOption "7" "View Configuration (XML)"
+        Write-MenuOption "8" "Backup/Restore"
+        Write-MenuOption "9" "Restart Transport Service"
         Write-MenuOption "H" "Help"
         Write-MenuOption "Q" "Quit"
 
@@ -510,10 +590,11 @@ function Show-MainMenu {
             "2" { Show-TestRulesMenu }
             "3" { Show-SettingsMenu }
             "4" { Show-LocalDomainsMenu }
-            "5" { Show-ConnectorsMenu }
-            "6" { Show-CurrentConfig }
-            "7" { Show-BackupMenu }
-            "8" { Restart-TransportService }
+            "5" { Show-LoggingMenu }
+            "6" { Show-ConnectorsMenu }
+            "7" { Show-CurrentConfig }
+            "8" { Show-BackupMenu }
+            "9" { Restart-TransportService }
             "H" { Show-Help }
             "Q" { return }
         }
@@ -1000,6 +1081,167 @@ function Show-LocalDomainsMenu {
                     if ($added -gt 0) { Save-Configuration | Out-Null; Write-Success "Added $added domain(s)" }
                     else { Write-Info "No new domains" }
                 } catch { Write-Err "Failed: $_" }
+                Pause-Menu
+            }
+            "B" { return }
+        }
+    }
+}
+
+function Show-LoggingMenu {
+    while ($true) {
+        Write-Header "Logging Settings"
+
+        $enabled = Get-LoggingSetting "enableFileLogging"
+        $level = Get-LoggingSetting "logLevel"
+        $path = Get-LoggingSetting "logPath"
+        $maxSize = Get-LoggingSetting "maxLogFileSizeMB"
+        $maxFiles = Get-LoggingSetting "maxLogFiles"
+
+        $defaultPath = Get-DefaultLogPath
+        $displayPath = if ($path) { $path } else { "$defaultPath (default)" }
+
+        $enabledText = if ($enabled -eq "true") { "[ON]" } else { "[OFF]" }
+        $enabledColor = if ($enabled -eq "true") { "Green" } else { "Red" }
+
+        Write-Host "  Current Settings:" -ForegroundColor DarkGray
+        Write-Host ""
+        Write-Host "  [1] File Logging:       " -NoNewline
+        Write-Host $enabledText -ForegroundColor $enabledColor
+        Write-Host "  [2] Log Level:          $level" -ForegroundColor Cyan
+        Write-Host "  [3] Log Path:           $displayPath" -ForegroundColor Cyan
+        Write-Host "  [4] Max File Size:      $maxSize MB" -ForegroundColor Cyan
+        Write-Host "  [5] Max Log Files:      $maxFiles" -ForegroundColor Cyan
+
+        Write-Host ""
+        Write-Host "  Log levels (in order of verbosity):" -ForegroundColor DarkGray
+        Write-Host "    None < Error < Warning < Info < Debug < Verbose" -ForegroundColor DarkGray
+        Write-Host ""
+
+        Write-MenuOption "1" "Toggle File Logging"
+        Write-MenuOption "2" "Change Log Level"
+        Write-MenuOption "3" "Set Log Path"
+        Write-MenuOption "4" "Set Max File Size"
+        Write-MenuOption "5" "Set Max Log Files"
+        Write-MenuOption "V" "View Log File"
+        Write-MenuOption "C" "Clear Log Files"
+        Write-MenuOption "B" "Back"
+
+        Write-Host ""
+        $choice = Read-Host "Select"
+
+        switch ($choice.ToUpper()) {
+            "1" {
+                $newValue = if ($enabled -eq "true") { "false" } else { "true" }
+                Set-LoggingSetting "enableFileLogging" $newValue
+
+                # Create log folder if enabling logging
+                if ($newValue -eq "true") {
+                    $logDir = if ($path) { $path } else { $defaultPath }
+                    if (-not (Test-Path $logDir)) {
+                        try {
+                            New-Item -Path $logDir -ItemType Directory -Force | Out-Null
+                            Write-Info "Created log folder: $logDir"
+                        }
+                        catch {
+                            Write-Warn "Could not create log folder: $_"
+                        }
+                    }
+                }
+
+                if (Save-Configuration) {
+                    $status = if ($newValue -eq "true") { "enabled" } else { "disabled" }
+                    Write-Success "File logging $status"
+                }
+                Pause-Menu
+            }
+            "2" {
+                Write-Host ""
+                Write-Host "  Available log levels:" -ForegroundColor DarkGray
+                Write-Host "  [1] None    - No logging" -ForegroundColor White
+                Write-Host "  [2] Error   - Errors only" -ForegroundColor White
+                Write-Host "  [3] Warning - Errors and warnings" -ForegroundColor White
+                Write-Host "  [4] Info    - Normal operation (recommended)" -ForegroundColor White
+                Write-Host "  [5] Debug   - Detailed debugging" -ForegroundColor White
+                Write-Host "  [6] Verbose - All messages" -ForegroundColor White
+                Write-Host ""
+                $levelChoice = Read-Host "Select level"
+
+                $newLevel = switch ($levelChoice) {
+                    "1" { "None" }
+                    "2" { "Error" }
+                    "3" { "Warning" }
+                    "4" { "Info" }
+                    "5" { "Debug" }
+                    "6" { "Verbose" }
+                    default { $null }
+                }
+
+                if ($newLevel) {
+                    Set-LoggingSetting "logLevel" $newLevel
+                    if (Save-Configuration) { Write-Success "Log level set to $newLevel" }
+                } else { Write-Warn "Invalid selection" }
+                Pause-Menu
+            }
+            "3" {
+                Write-Host ""
+                Write-Host "  Current: $displayPath" -ForegroundColor DarkGray
+                Write-Host "  Leave empty to use default Exchange logs folder." -ForegroundColor DarkGray
+                Write-Host ""
+                $newPath = Read-Host "Enter new log path (or press Enter for default)"
+
+                Set-LoggingSetting "logPath" $newPath
+                if (Save-Configuration) {
+                    if ($newPath) { Write-Success "Log path set to: $newPath" }
+                    else { Write-Success "Log path set to default" }
+                }
+                Pause-Menu
+            }
+            "4" {
+                Write-Host ""
+                $newSize = Read-Host "Enter max file size in MB (current: $maxSize)"
+                if ($newSize -match '^\d+$' -and [int]$newSize -gt 0) {
+                    Set-LoggingSetting "maxLogFileSizeMB" $newSize
+                    if (Save-Configuration) { Write-Success "Max file size set to $newSize MB" }
+                } else { Write-Warn "Invalid value. Must be a positive number." }
+                Pause-Menu
+            }
+            "5" {
+                Write-Host ""
+                $newCount = Read-Host "Enter max log files to keep (current: $maxFiles)"
+                if ($newCount -match '^\d+$' -and [int]$newCount -gt 0) {
+                    Set-LoggingSetting "maxLogFiles" $newCount
+                    if (Save-Configuration) { Write-Success "Max log files set to $newCount" }
+                } else { Write-Warn "Invalid value. Must be a positive number." }
+                Pause-Menu
+            }
+            "V" {
+                $logDir = if ($path) { $path } else { $defaultPath }
+                $logFile = Join-Path $logDir "AdvancedSenderRouting.log"
+
+                if (Test-Path $logFile) {
+                    Write-Host ""
+                    Write-Host "=== Last 50 lines of log ===" -ForegroundColor Cyan
+                    Get-Content $logFile -Tail 50 | ForEach-Object { Write-Host $_ }
+                } else {
+                    Write-Warn "Log file not found: $logFile"
+                }
+                Pause-Menu
+            }
+            "C" {
+                $logDir = if ($path) { $path } else { $defaultPath }
+                Write-Host ""
+                $confirm = Read-Host "Delete all log files in $logDir? (y/n)"
+                if ($confirm -eq "y") {
+                    try {
+                        if (Test-Path $logDir) {
+                            Get-ChildItem $logDir -Filter "AdvancedSenderRouting*.log" | Remove-Item -Force
+                            Write-Success "Log files cleared"
+                        } else {
+                            Write-Info "Log directory does not exist"
+                        }
+                    } catch { Write-Err "Failed: $_" }
+                }
                 Pause-Menu
             }
             "B" { return }
