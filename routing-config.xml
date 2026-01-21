@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Advanced Sender Based Routing Agent Configuration
+  =================================================
+
+  IMPORTANT: How Sender-Based Routing Works
+  =========================================
+  Exchange routes emails through Send Connectors based on ADDRESS SPACES.
+  This agent overrides routing based on SENDER and/or RECIPIENT conditions.
+
+  Features:
+  - Route by sender domain/address
+  - Route by recipient domain/address (advanced rules)
+  - Change From header and Return-Path with sendAsAlias
+  - Wildcard support (* and ?) in all matching fields
+  - Per-recipient routing decisions
+
+  Setup (use configure.ps1 or configure-gui.ps1):
+  1. Create a Send Connector with a unique address space for each route
+  2. Configure the connector's smart host
+  3. Add a routing rule here that maps sender/recipient to address space
+
+  Example:
+  - Connector "SRA-Route-10-10-10-10" has:
+    - Address space: "route-10-10-10-10.local"
+    - Smart host: "10.10.10.10"
+  - Rule: senderDomain="@company1.com" addressSpace="route-10-10-10-10.local"
+  - Result: Emails from @company1.com go through 10.10.10.10
+
+  Manual connector creation:
+  New-SendConnector -Name "SRA-Route-10-10-10-10" `
+      -AddressSpaces "SMTP:route-10-10-10-10.local;1" `
+      -SmartHosts "10.10.10.10" `
+      -Usage Custom -DNSRoutingEnabled $false
+-->
+<configuration>
+
+  <settings>
+    <enableSendAsAlias>true</enableSendAsAlias>
+    <enableSenderBasedRouting>true</enableSenderBasedRouting>
+    <!-- Skip routing override for local recipients (deliver directly) -->
+    <bypassLocalRecipients>true</bypassLocalRecipients>
+    <!--
+      Route by From header (P2/alias) instead of envelope sender (P1/primary).
+      Set to true if you want routing rules to match the alias address the user selects.
+    -->
+    <routeByHeaderFrom>true</routeByHeaderFrom>
+    <!--
+      Validate that sender has the alias domain in their proxy addresses.
+      If enabled, checks if user's From header already shows an address in the target alias domain.
+    -->
+    <validateProxyAddresses>true</validateProxyAddresses>
+    <!--
+      If validateProxyAddresses is true and sender doesn't have alias in target domain,
+      block the alias/routing modification (email goes through default routing).
+    -->
+    <blockIfNoAlias>false</blockIfNoAlias>
+  </settings>
+
+  <!--
+    Local domains - recipients in these domains will be delivered directly
+    (not routed through sender-based rules when bypassLocalRecipients=true)
+  -->
+  <localDomains>
+    <domain>lab.sith.uz</domain>
+    <domain>lab2.sith.uz</domain>
+    <!-- Add your internal domains here -->
+  </localDomains>
+
+  <!--
+    Routing Rules
+
+    Attributes:
+    - name:            Rule name for identification (optional)
+    - enabled:         Enable/disable rule (default: true)
+    - senderDomain:    Match emails from this domain (e.g., "@sales.company.com")
+    - senderAddress:   Match specific sender address (e.g., "user@company.com")
+    - recipientDomain: Match emails to this domain (e.g., "@partner.com") - optional
+    - recipientAddress: Match specific recipient (e.g., "orders@partner.com") - optional
+    - addressSpace:    Address space of the target Send Connector
+    - sendAsAlias:     Change From header to this alias domain or address
+                       Use "@domain.com" to construct alias from sender's local part
+                       Use "user@domain.com" to use exact address
+
+    WILDCARDS SUPPORTED:
+    - * = matches any characters (zero or more)
+    - ? = matches any single character
+    Examples:
+      senderDomain="*.company.com"      - matches sub1.company.com, sub2.company.com
+      senderAddress="admin*@domain.com" - matches admin@domain.com, admin1@domain.com
+      recipientDomain="partner?.com"    - matches partner1.com, partnerA.com
+
+    Rules are evaluated in order; first match wins.
+    If recipientDomain/recipientAddress not specified, rule matches all recipients.
+    Use configure-gui.ps1 for visual rule management and testing.
+  -->
+  <routingRules>
+
+    <!-- BASIC RULES (sender only) -->
+
+    <!-- Example: Route all emails from @lab2.sith.uz through connector AND change From to @ya.ru alias -->
+    <!-- <rule name="Lab2-AllRecipients" senderDomain="@lab2.sith.uz" addressSpace="route-10-10-10-10.local" sendAsAlias="@ya.ru" /> -->
+
+    <!-- Example: Route with specific From address -->
+    <!-- <rule name="Lab-Noreply" senderDomain="@lab.sith.uz" addressSpace="route-10-10-20-20.local" sendAsAlias="noreply@company.com" /> -->
+
+
+    <!-- ADVANCED RULES (sender AND recipient conditions) -->
+
+    <!-- Example: Route emails from @sales.company.com TO @partner.com through specific connector -->
+    <!-- <rule name="Sales-to-Partner"
+          senderDomain="@sales.company.com"
+          recipientDomain="@partner.com"
+          addressSpace="route-partner-relay.local"
+          sendAsAlias="@salesteam.com" /> -->
+
+    <!-- Example: Route emails from specific user TO specific recipient -->
+    <!-- <rule name="CEO-to-VIP"
+          senderAddress="ceo@company.com"
+          recipientAddress="vip@important-client.com"
+          addressSpace="route-secure-relay.local" /> -->
+
+    <!-- Example: Disable a rule without removing it -->
+    <!-- <rule name="Disabled-Test-Rule"
+          enabled="false"
+          senderDomain="@test.com"
+          addressSpace="route-test.local" /> -->
+
+    <!-- Example: Multiple rules for same sender, different recipients -->
+    <!-- <rule name="Marketing-External"
+          senderDomain="@marketing.company.com"
+          recipientDomain="@external-agency.com"
+          addressSpace="route-agency-relay.local"
+          sendAsAlias="@brand.com" /> -->
+
+    <!-- <rule name="Marketing-Default"
+          senderDomain="@marketing.company.com"
+          addressSpace="route-default.local" /> -->
+
+  </routingRules>
+
+</configuration>

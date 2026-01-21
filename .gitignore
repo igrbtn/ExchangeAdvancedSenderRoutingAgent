@@ -1,0 +1,41 @@
+# Build output
+*.dll
+*.pdb
+*.exe
+
+# NuGet
+packages/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.cache
+bin/
+obj/
+
+# Exchange DLLs (must be copied from Exchange server)
+src/lib/*.dll
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Backup files
+*.bak
+*.old
+*.backup
+*~
+
+# Log files
+*.log
+
+# Temporary files
+*.tmp
+*.temp
